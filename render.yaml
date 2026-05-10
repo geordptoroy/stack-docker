@@ -1,33 +1,27 @@
 # render.yaml – Blueprint versão 2 (necessário para bancos gerenciados)
 version: "2"
 
-services:
-  # ==========================================================================
-  # BANCOS DE DADOS GERENCIADOS (Render PostgreSQL)
-  # ==========================================================================
-  - type: postgres
-    name: pastorini-db
-    databaseName: pastorini
-    plan: starter          # ou "free" (hiberna após inatividade)
-    ipAllowList: []        # somente conexões internas (recomendado)
-
-  - type: postgres
-    name: n8n-db
-    databaseName: n8n
+# --- SEÇÃO DE BANCOS DE DADOS GERENCIADOS (FORA DO SERVICES) ---
+databases:
+  # Banco de Dados da API Pastorini
+  - name: pastorini-db
     plan: starter
+    databaseName: pastorini
+    ipAllowList: []        # Conexões internas (recomendado)
+
+  # Banco de Dados do n8n
+  - name: n8n-db
+    plan: starter
+    databaseName: n8n
     ipAllowList: []
 
-  # ==========================================================================
-  # CACHE GERENCIADO (Render Redis / KV)
-  # ==========================================================================
+# --- SEÇÃO DE CACHE GERENCIADO (Usando type: redis) ---
+services:
+  # Cache Redis da API Pastorini
   - type: redis
     name: pastorini-cache
     plan: starter
     ipAllowList: []
-
-  # ==========================================================================
-  # SERVIÇOS WEB (CONTAINERS)
-  # ==========================================================================
 
   # ----------------------------- n8n ---------------------------------------
   - type: web
@@ -44,11 +38,15 @@ services:
       - key: DB_TYPE
         value: postgresdb
       - key: DB_POSTGRESDB_HOST
-        value: n8n-db
+        fromDatabase:
+          name: n8n-db
+          property: host
       - key: DB_POSTGRESDB_PORT
         value: "5432"
       - key: DB_POSTGRESDB_DATABASE
-        value: n8n
+        fromDatabase:
+          name: n8n-db
+          property: database
       - key: DB_POSTGRESDB_USER
         fromDatabase:
           name: n8n-db
@@ -94,15 +92,19 @@ services:
       - key: PORT
         value: "3000"
       - key: PANEL_API_KEY
-        value: "teste123"
+        generateValue: true  # Gera uma chave aleatória
       - key: STORAGE_TYPE
         value: postgres+redis
       - key: POSTGRES_HOST
-        value: pastorini-db
+        fromDatabase:
+          name: pastorini-db
+          property: host
       - key: POSTGRES_PORT
         value: "5432"
       - key: POSTGRES_DB
-        value: pastorini
+        fromDatabase:
+          name: pastorini-db
+          property: database
       - key: POSTGRES_USER
         fromDatabase:
           name: pastorini-db
