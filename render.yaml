@@ -1,5 +1,5 @@
-# render.yaml – Blueprint para subir a stack Pastorini + n8n + LocalAI + Qdrant
-# Basta colocar este arquivo na raiz do seu repositório e conectar no Render.
+# render.yaml – Blueprint versão 2 (necessário para bancos gerenciados)
+version: "2"
 
 services:
   # ==========================================================================
@@ -10,7 +10,6 @@ services:
     databaseName: pastorini
     plan: starter          # ou "free" (hiberna após inatividade)
     ipAllowList: []        # somente conexões internas (recomendado)
-    # As credenciais de acesso serão injetadas automaticamente nos serviços.
 
   - type: postgres
     name: n8n-db
@@ -119,26 +118,21 @@ services:
       - key: REDIS_PORT
         value: "6379"
       - key: REDIS_PASSWORD
-        value: ""              # Render Redis não exige senha por padrão na rede interna
+        value: ""              # Rede interna do Render não exige senha
       - key: REDIS_DB
         value: "0"
       - key: LICENSE_KEY
         value: "93FCC67B-950C58A6-3A68BCEF-C77B80F0"
     persistentDisk:
-      # Como a API usa dois volumes (sessions e Media), montamos um disco único e
-      # a aplicação deve ser configurada para salvar ambos dentro de /app/data.
-      # Caso não seja possível, use um bucket S3 para persistência real.
       mountPath: /app/data
       sizeGB: 10
-    # Nota: Se a imagem não suportar /app/data, você pode criar subpastas
-    # e ajustar as variáveis de ambiente da API para apontar para lá.
 
   # ----------------------------- LocalAI (API OpenAI local) --------------------
   - type: web
     name: localai
     env: docker
     image: localai/localai:latest
-    plan: standard        # pode precisar de mais CPU/RAM
+    plan: standard        # Requer mais CPU/RAM, não use free
     envVars:
       - key: THREADS
         value: "4"
