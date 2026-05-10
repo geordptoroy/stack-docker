@@ -1,0 +1,162 @@
+# render.yaml – Blueprint para subir a stack Pastorini + n8n + LocalAI + Qdrant
+# Basta colocar este arquivo na raiz do seu repositório e conectar no Render.
+
+services:
+  # ==========================================================================
+  # BANCOS DE DADOS GERENCIADOS (Render PostgreSQL)
+  # ==========================================================================
+  - type: postgres
+    name: pastorini-db
+    databaseName: pastorini
+    plan: starter          # ou "free" (hiberna após inatividade)
+    ipAllowList: []        # somente conexões internas (recomendado)
+    # As credenciais de acesso serão injetadas automaticamente nos serviços.
+
+  - type: postgres
+    name: n8n-db
+    databaseName: n8n
+    plan: starter
+    ipAllowList: []
+
+  # ==========================================================================
+  # CACHE GERENCIADO (Render Redis / KV)
+  # ==========================================================================
+  - type: redis
+    name: pastorini-cache
+    plan: starter
+    ipAllowList: []
+
+  # ==========================================================================
+  # SERVIÇOS WEB (CONTAINERS)
+  # ==========================================================================
+
+  # ----------------------------- n8n ---------------------------------------
+  - type: web
+    name: n8n
+    env: docker
+    image: n8nio/n8n:latest
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: GENERIC_TIMEZONE
+        value: America/Sao_Paulo
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: DB_TYPE
+        value: postgresdb
+      - key: DB_POSTGRESDB_HOST
+        value: n8n-db
+      - key: DB_POSTGRESDB_PORT
+        value: "5432"
+      - key: DB_POSTGRESDB_DATABASE
+        value: n8n
+      - key: DB_POSTGRESDB_USER
+        fromDatabase:
+          name: n8n-db
+          property: user
+      - key: DB_POSTGRESDB_PASSWORD
+        fromDatabase:
+          name: n8n-db
+          property: password
+      - key: N8N_BASIC_AUTH_ACTIVE
+        value: "true"
+      - key: N8N_BASIC_AUTH_USER
+        value: admin
+      - key: N8N_BASIC_AUTH_PASSWORD
+        value: admin123
+      - key: N8N_HOST
+        value: n8n
+      - key: N8N_PORT
+        value: "5678"
+      - key: N8N_PROTOCOL
+        value: http
+      - key: WEBHOOK_URL
+        value: http://n8n:5678
+      - key: N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE
+        value: "true"
+      - key: N8N_AI_TIMEOUT
+        value: "3600000"
+      - key: N8N_CUSTOM_EXTENSIONS
+        value: "@aorizondo/n8n-nodes-evolution,n8n-evolution-tools,n8n-nodes-mcp"
+    persistentDisk:
+      mountPath: /home/node/.n8n
+      sizeGB: 5
+
+  # ----------------------------- API Pastorini (WhatsApp) ---------------------
+  - type: web
+    name: pastorini-api
+    env: docker
+    image: intrategica/papi-free:1.5.1
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: PANEL_API_KEY
+        value: "teste123"
+      - key: STORAGE_TYPE
+        value: postgres+redis
+      - key: POSTGRES_HOST
+        value: pastorini-db
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_DB
+        value: pastorini
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: pastorini-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: pastorini-db
+          property: password
+      - key: POSTGRES_SSL
+        value: "false"
+      - key: REDIS_HOST
+        value: pastorini-cache
+      - key: REDIS_PORT
+        value: "6379"
+      - key: REDIS_PASSWORD
+        value: ""              # Render Redis não exige senha por padrão na rede interna
+      - key: REDIS_DB
+        value: "0"
+      - key: LICENSE_KEY
+        value: "93FCC67B-950C58A6-3A68BCEF-C77B80F0"
+    persistentDisk:
+      # Como a API usa dois volumes (sessions e Media), montamos um disco único e
+      # a aplicação deve ser configurada para salvar ambos dentro de /app/data.
+      # Caso não seja possível, use um bucket S3 para persistência real.
+      mountPath: /app/data
+      sizeGB: 10
+    # Nota: Se a imagem não suportar /app/data, você pode criar subpastas
+    # e ajustar as variáveis de ambiente da API para apontar para lá.
+
+  # ----------------------------- LocalAI (API OpenAI local) --------------------
+  - type: web
+    name: localai
+    env: docker
+    image: localai/localai:latest
+    plan: standard        # pode precisar de mais CPU/RAM
+    envVars:
+      - key: THREADS
+        value: "4"
+      - key: DEBUG
+        value: "true"
+    persistentDisk:
+      mountPath: /models
+      sizeGB: 20
+
+  # ----------------------------- Qdrant (Banco Vetorial) -----------------------
+  - type: web
+    name: qdrant
+    env: docker
+    image: qdrant/qdrant:latest
+    plan: starter
+    envVars:
+      - key: QDRANT__SERVICE__HTTP_PORT
+        value: "6333"
+    persistentDisk:
+      mountPath: /qdrant/storage
+      sizeGB: 10
