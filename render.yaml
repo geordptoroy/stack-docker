@@ -1,158 +1,165 @@
-# render.yaml – Blueprint versão 2 (necessário para bancos gerenciados)
-version: "2"
-
-# --- SEÇÃO DE BANCOS DE DADOS GERENCIADOS (FORA DO SERVICES) ---
-databases:
-  # Banco de Dados da API Pastorini
-  - name: pastorini-db
-    plan: starter
-    databaseName: pastorini
-    ipAllowList: []        # Conexões internas (recomendado)
-
-  # Banco de Dados do n8n
-  - name: n8n-db
-    plan: starter
-    databaseName: n8n
-    ipAllowList: []
-
-# --- SEÇÃO DE CACHE GERENCIADO (Usando type: redis) ---
 services:
-  # Cache Redis da API Pastorini
-  - type: redis
-    name: pastorini-cache
-    plan: starter
-    ipAllowList: []
-
-  # ----------------------------- n8n ---------------------------------------
+  # =========================
+  # N8N
+  # =========================
   - type: web
     name: n8n
-    env: docker
-    image: n8nio/n8n:latest
+    runtime: image
+    image:
+      url: n8nio/n8n:latest
     plan: starter
-    healthCheckPath: /healthz
     envVars:
-      - key: GENERIC_TIMEZONE
-        value: America/Sao_Paulo
-      - key: TZ
-        value: America/Sao_Paulo
       - key: DB_TYPE
         value: postgresdb
+
       - key: DB_POSTGRESDB_HOST
         fromDatabase:
           name: n8n-db
           property: host
+
       - key: DB_POSTGRESDB_PORT
-        value: "5432"
+        fromDatabase:
+          name: n8n-db
+          property: port
+
       - key: DB_POSTGRESDB_DATABASE
         fromDatabase:
           name: n8n-db
           property: database
+
       - key: DB_POSTGRESDB_USER
         fromDatabase:
           name: n8n-db
           property: user
+
       - key: DB_POSTGRESDB_PASSWORD
         fromDatabase:
           name: n8n-db
           property: password
+
       - key: N8N_BASIC_AUTH_ACTIVE
         value: "true"
+
       - key: N8N_BASIC_AUTH_USER
         value: admin
+
       - key: N8N_BASIC_AUTH_PASSWORD
         value: admin123
-      - key: N8N_HOST
-        value: n8n
-      - key: N8N_PORT
-        value: "5678"
-      - key: N8N_PROTOCOL
-        value: http
-      - key: WEBHOOK_URL
-        value: http://n8n:5678
-      - key: N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE
-        value: "true"
-      - key: N8N_AI_TIMEOUT
-        value: "3600000"
-      - key: N8N_CUSTOM_EXTENSIONS
-        value: "@aorizondo/n8n-nodes-evolution,n8n-evolution-tools,n8n-nodes-mcp"
-    persistentDisk:
-      mountPath: /home/node/.n8n
-      sizeGB: 5
 
-  # ----------------------------- API Pastorini (WhatsApp) ---------------------
+      - key: N8N_HOST
+        value: n8n.onrender.com
+
+      - key: WEBHOOK_URL
+        value: https://n8n.onrender.com
+
+      - key: GENERIC_TIMEZONE
+        value: America/Sao_Paulo
+
+  # =========================
+  # PAPI
+  # =========================
   - type: web
     name: pastorini-api
-    env: docker
-    image: intrategica/papi-free:1.5.1
+    runtime: image
+    image:
+      url: intrategica/papi-free:1.5.1
     plan: starter
-    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+
       - key: PORT
-        value: "3000"
+        value: 3000
+
       - key: PANEL_API_KEY
-        generateValue: true  # Gera uma chave aleatória
+        value: teste123
+
       - key: STORAGE_TYPE
         value: postgres+redis
+
       - key: POSTGRES_HOST
         fromDatabase:
-          name: pastorini-db
+          name: papi-db
           property: host
+
       - key: POSTGRES_PORT
-        value: "5432"
+        fromDatabase:
+          name: papi-db
+          property: port
+
       - key: POSTGRES_DB
         fromDatabase:
-          name: pastorini-db
+          name: papi-db
           property: database
+
       - key: POSTGRES_USER
         fromDatabase:
-          name: pastorini-db
+          name: papi-db
           property: user
+
       - key: POSTGRES_PASSWORD
         fromDatabase:
-          name: pastorini-db
+          name: papi-db
           property: password
-      - key: POSTGRES_SSL
-        value: "false"
+
       - key: REDIS_HOST
-        value: pastorini-cache
+        fromService:
+          type: redis
+          name: papi-redis
+          property: host
+
       - key: REDIS_PORT
-        value: "6379"
-      - key: REDIS_PASSWORD
-        value: ""              # Rede interna do Render não exige senha
-      - key: REDIS_DB
-        value: "0"
-      - key: LICENSE_KEY
-        value: "93FCC67B-950C58A6-3A68BCEF-C77B80F0"
-    persistentDisk:
-      mountPath: /app/data
-      sizeGB: 10
+        fromService:
+          type: redis
+          name: papi-redis
+          property: port
 
-  # ----------------------------- LocalAI (API OpenAI local) --------------------
+  # =========================
+  # EASY APPOINTMENTS
+  # =========================
   - type: web
-    name: localai
-    env: docker
-    image: localai/localai:latest
-    plan: standard        # Requer mais CPU/RAM, não use free
-    envVars:
-      - key: THREADS
-        value: "4"
-      - key: DEBUG
-        value: "true"
-    persistentDisk:
-      mountPath: /models
-      sizeGB: 20
-
-  # ----------------------------- Qdrant (Banco Vetorial) -----------------------
-  - type: web
-    name: qdrant
-    env: docker
-    image: qdrant/qdrant:latest
+    name: easyappointments
+    runtime: image
+    image:
+      url: alextselegidis/easyappointments:latest
     plan: starter
     envVars:
-      - key: QDRANT__SERVICE__HTTP_PORT
-        value: "6333"
-    persistentDisk:
-      mountPath: /qdrant/storage
-      sizeGB: 10
+      - key: DB_HOST
+        fromDatabase:
+          name: easy-db
+          property: host
+
+      - key: DB_NAME
+        fromDatabase:
+          name: easy-db
+          property: database
+
+      - key: DB_USERNAME
+        fromDatabase:
+          name: easy-db
+          property: user
+
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: easy-db
+          property: password
+
+databases:
+  - name: n8n-db
+    plan: free
+    databaseName: n8n
+    user: n8n
+
+  - name: papi-db
+    plan: free
+    databaseName: pastorini
+    user: postgres
+
+  - name: easy-db
+    plan: free
+    databaseName: easyappointments
+    user: easyuser
+
+redis:
+  - name: papi-redis
+    plan: free
