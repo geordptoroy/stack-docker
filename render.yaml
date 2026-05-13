@@ -151,10 +151,7 @@ services:
           property: port
 
       - key: REDIS_PASSWORD
-        fromService:
-          type: redis
-          name: papi-redis
-          property: password
+        value: ""
 
       - key: REDIS_DB
         value: "0"
@@ -222,7 +219,7 @@ databases:
   # =========================================================
   - name: n8n-db
     databaseName: n8n
-    user: n8n
+    user: n8nuser
     plan: starter
 
   # =========================================================
@@ -230,7 +227,7 @@ databases:
   # =========================================================
   - name: papi-db
     databaseName: pastorini
-    user: postgres
+    user: papiuser
     plan: starter
 
   # =========================================================
