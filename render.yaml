@@ -1,14 +1,33 @@
 services:
-  # =========================
+  # =========================================================
+  # REDIS
+  # =========================================================
+  - type: redis
+    name: papi-redis
+    plan: starter
+    ipAllowList: []
+
+  # =========================================================
   # N8N
-  # =========================
+  # =========================================================
   - type: web
     name: n8n
     runtime: image
+
     image:
       url: n8nio/n8n:latest
+
     plan: starter
+
+    healthCheckPath: /
+
     envVars:
+      - key: GENERIC_TIMEZONE
+        value: America/Sao_Paulo
+
+      - key: TZ
+        value: America/Sao_Paulo
+
       - key: DB_TYPE
         value: postgresdb
 
@@ -46,30 +65,44 @@ services:
       - key: N8N_BASIC_AUTH_PASSWORD
         value: admin123
 
+      - key: N8N_PROTOCOL
+        value: https
+
       - key: N8N_HOST
         value: n8n.onrender.com
 
       - key: WEBHOOK_URL
         value: https://n8n.onrender.com
 
-      - key: GENERIC_TIMEZONE
-        value: America/Sao_Paulo
+      - key: N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE
+        value: "true"
 
-  # =========================
-  # PAPI
-  # =========================
+      - key: N8N_AI_TIMEOUT
+        value: "3600000"
+
+      - key: N8N_CUSTOM_EXTENSIONS
+        value: "@aorizondo/n8n-nodes-evolution,n8n-evolution-tools,n8n-nodes-mcp"
+
+  # =========================================================
+  # PAPI / WHATSAPP
+  # =========================================================
   - type: web
     name: pastorini-api
     runtime: image
+
     image:
       url: intrategica/papi-free:1.5.1
+
     plan: starter
+
+    healthCheckPath: /health
+
     envVars:
       - key: NODE_ENV
         value: production
 
       - key: PORT
-        value: 3000
+        value: "3000"
 
       - key: PANEL_API_KEY
         value: teste123
@@ -102,6 +135,9 @@ services:
           name: papi-db
           property: password
 
+      - key: POSTGRES_SSL
+        value: "false"
+
       - key: REDIS_HOST
         fromService:
           type: redis
@@ -114,15 +150,48 @@ services:
           name: papi-redis
           property: port
 
-  # =========================
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: papi-redis
+          property: password
+
+      - key: REDIS_DB
+        value: "0"
+
+      - key: LICENSE_KEY
+        value: 93FCC67B-950C58A6-3A68BCEF-C77B80F0
+
+  # =========================================================
+  # QDRANT
+  # =========================================================
+  - type: web
+    name: qdrant
+    runtime: image
+
+    image:
+      url: qdrant/qdrant:latest
+
+    plan: starter
+
+    healthCheckPath: /
+
+    envVars:
+      - key: QDRANT__SERVICE__HTTP_PORT
+        value: "6333"
+
+  # =========================================================
   # EASY APPOINTMENTS
-  # =========================
+  # =========================================================
   - type: web
     name: easyappointments
     runtime: image
+
     image:
       url: alextselegidis/easyappointments:latest
+
     plan: starter
+
     envVars:
       - key: DB_HOST
         fromDatabase:
@@ -144,22 +213,30 @@ services:
           name: easy-db
           property: password
 
+      - key: TZ
+        value: America/Sao_Paulo
+
 databases:
+  # =========================================================
+  # N8N DATABASE
+  # =========================================================
   - name: n8n-db
-    plan: free
     databaseName: n8n
     user: n8n
+    plan: starter
 
+  # =========================================================
+  # PAPI DATABASE
+  # =========================================================
   - name: papi-db
-    plan: free
     databaseName: pastorini
     user: postgres
+    plan: starter
 
+  # =========================================================
+  # EASY APPOINTMENTS DATABASE
+  # =========================================================
   - name: easy-db
-    plan: free
     databaseName: easyappointments
     user: easyuser
-
-redis:
-  - name: papi-redis
-    plan: free
+    plan: starter
